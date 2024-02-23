@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <deque>
 #include <cassert>
+#include <cmath>
 
 
 struct Item {
@@ -72,7 +73,8 @@ void run() {
         input.push_back(Item{cost, weight});
     }
     std::sort(input.begin(), input.end(), comp);
-    const size_t first_elements = std::min(15UL, n);
+    size_t first_elements = std::round(std::log2(1e8 / n)) + 1;
+    first_elements = std::min(first_elements, n);
     uint64_t best_result = 0;
 
     for (size_t mask = 0; mask < (1 << first_elements); ++mask) {
