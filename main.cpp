@@ -62,19 +62,35 @@ bool get_bit(uint64_t mask, size_t i) {
     return (mask >> i) & 1;
 }
 
-void run() {
-    std::ifstream fin("./data/ks_10000_0");
-    uint64_t n, backpack_weight;
-    fin >> n >> backpack_weight;
-    std::deque<Item> input;
-    for (size_t i = 0; i < n; ++i) {
-        uint64_t cost, weight;
-        fin >> cost >> weight;
-        input.push_back(Item{cost, weight});
+
+double RandDouble(double fMin, double fMax)
+{
+    double f = (double)rand() / RAND_MAX;
+    return fMin + f * (fMax - fMin);
+}
+
+uint64_t RandomGreedyTmp(uint64_t backpack_weight, const std::deque<Item>& input) {
+    uint64_t current_weight = 0;
+    uint64_t current_cost = 0;
+    for (size_t i = 0; i < input.size(); ++i) {
+        const auto& item = input[i];
+        double chance = 1 / (double)(input.size() - i + 1);
+        if (RandDouble(0.0, 1.0) < chance) {
+            continue;
+        }
+        if (current_weight + item.weight <= backpack_weight) {
+            current_weight += item.weight;
+            current_cost += item.cost;
+        }
     }
-    std::sort(input.begin(), input.end(), comp);
+    return current_cost;
+}
+
+
+uint64_t ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::deque<Item>& input) {
     size_t first_elements = std::round(std::log2(1e8 / n)) + 1;
     first_elements = std::min(first_elements, n);
+
     uint64_t best_result = 0;
 
     for (size_t mask = 0; mask < (1 << first_elements); ++mask) {
@@ -95,16 +111,33 @@ void run() {
         assert(IsCorrect(another_result, backpack_weight, input));
 
         best_result = std::max(best_result, another_result.cost);
-        
     }
+    return best_result;
+}
 
+uint64_t RandomGreedy(uint64_t n, uint64_t backpack_weight, const std::deque<Item>& input) {
+    uint64_t best_result = 0;
+    for (size_t i = 0; i < 1e8 / n; ++i) {
+        best_result = std::max(RandomGreedyTmp(backpack_weight, input), best_result);
+    }
+    return best_result;
+}
+
+
+void run() {
+    std::ifstream fin("./data/ks_400_0");
+    uint64_t n, backpack_weight;
+    fin >> n >> backpack_weight;
+    std::deque<Item> input;
+    for (size_t i = 0; i < n; ++i) {
+        uint64_t cost, weight;
+        fin >> cost >> weight;
+        input.push_back(Item{cost, weight});
+    }
+    std::sort(input.begin(), input.end(), comp);
+    // /*
     
-    /*while (!input.empty()) {
-        best_result = std::max(best_result, get_greedy(backpack_weight, input));
-        input.pop_front();
-    }*/
-    
-    std::cout << best_result << std::endl;
+    std::cout << std::max(RandomGreedy(n, backpack_weight, input), ExponentialGreedy(n, backpack_weight, input));
 }
 
 
