@@ -10,4 +10,16 @@ make
 
 echo "compilation finished"
 
-./backpack "../data/ks_30_0" | ./checker "../data/ks_30_0"
+file_names=( ks_30_0 ks_50_0 ks_200_0 ks_400_0 ks_1000_0 ks_10000_0 )
+
+
+for file_name in "${file_names[@]}"
+do
+    path="../data/$file_name"
+    echo "Processing file $path"
+    if [ -f $path ]; then
+        ./backpack $path | ./checker $path
+    else
+        echo "File does not exist."
+    fi
+done

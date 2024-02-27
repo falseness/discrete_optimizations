@@ -9,7 +9,7 @@
 
 int main(int argc, char *argv[]) {
     assert(argc == 2);
-    
+
     uint64_t indices_count;
     std::cin >> indices_count;
     std::unordered_set<uint64_t> indices;

@@ -28,22 +28,6 @@ struct Result {
     }
 };
 
-bool IsCorrect(const Result& result, uint64_t backpack_weight, const std::vector<Item>& input) {
-    uint64_t current_weight = 0;
-    uint64_t current_cost = 0;
-    for (auto index : result.indices) {
-        const auto& item = input.at(index); 
-        current_weight += item.weight;
-        current_cost += item.cost;
-    }
-    bool is_correct = current_weight <= backpack_weight && current_cost == result.cost && current_weight == result.weight;
-    if (is_correct) {
-        return true;
-    }  
-    std::cout << "INCORRECT " << backpack_weight << ' ' << current_weight << ' ' << current_cost << ' ' << result.weight << ' ' << result.cost << std::endl;
-    return false;
-}
-
 Result GetGreedy(const uint64_t backpack_weight, const size_t index_to_start,
                  const std::vector<Item> &input) {
   Result result;
@@ -60,8 +44,7 @@ bool get_bit(uint64_t mask, size_t i) {
 }
 
 
-double RandDouble(double fMin, double fMax)
-{
+double RandDouble(double fMin, double fMax) {
     double f = (double)rand() / RAND_MAX;
     return fMin + f * (fMax - fMin);
 }
@@ -103,7 +86,6 @@ Result ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::vector
         for (auto index : result.indices) {
             another_result.Insert(index, input);
         }
-        assert(IsCorrect(another_result, backpack_weight, input));
 
         best_backpack = std::max(best_backpack, another_result);
     }
@@ -127,7 +109,7 @@ int main(int argc, char *argv[]) {
     std::vector<size_t> sorted_indices(input.n);
     std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
     std::sort(sorted_indices.begin(), sorted_indices.end(), [&](size_t lhs, size_t rhs) {
-        return input.items[lhs].cost * input.items[lhs].weight > input.items[lhs].cost * input.items[lhs].weight;
+        return input.items[lhs].cost * input.items[rhs].weight > input.items[rhs].cost * input.items[lhs].weight;
     });
     std::vector<Item> sorted_items;
     sorted_items.reserve(input.n);
@@ -136,15 +118,12 @@ int main(int argc, char *argv[]) {
     }
     input.items = std::move(sorted_items);
 
-    std::vector<size_t> inverse_permutation(input.n);
-    for (size_t i = 0; i < input.n; ++i) {
-        inverse_permutation[sorted_indices[i]] = i;
-    }
 
+    auto result = std::max(RandomGreedy(input.n, input.backpack_weight, input.items),
+                        ExponentialGreedy(input.n, input.backpack_weight, input.items));
 
-    auto result = std::max(RandomGreedy(input.n, input.backpack_weight, input.items), ExponentialGreedy(input.n, input.backpack_weight, input.items));
     std::cout << result.indices.size() << '\n';
     for (auto index : result.indices) {
-        std::cout << inverse_permutation[index] << ' ';
+        std::cout << sorted_indices[index] << ' ';
     }
 }
