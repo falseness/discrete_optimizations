@@ -49,21 +49,21 @@ double RandDouble(double fMin, double fMax) {
     return fMin + f * (fMax - fMin);
 }
 
-Result RandomGreedyTmp(uint64_t backpack_weight, const std::vector<Item>& input) {
-    Result backpack;
-    for (size_t i = 0; i < input.size(); ++i) {
-        const auto& item = input[i];
-        double chance = 1 / (double)(input.size() + 1);
-        if (RandDouble(0.0, 1.0) < chance) {
-            continue;
-        }
-        if (backpack.weight + item.weight <= backpack_weight) {
-            backpack.Insert(i, input);
-        }
+Result RandomGreedyOnce(uint64_t backpack_weight,
+                        const std::vector<Item> &input) {
+  Result backpack;
+  for (size_t i = 0; i < input.size(); ++i) {
+    const auto &item = input[i];
+    double chance = 1 / (double)(input.size() + 1);
+    if (RandDouble(0.0, 1.0) < chance) {
+      continue;
     }
-    return backpack;
+    if (backpack.weight + item.weight <= backpack_weight) {
+      backpack.Insert(i, input);
+    }
+  }
+  return backpack;
 }
-
 
 Result ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::vector<Item>& input) {
     size_t first_elements = std::round(std::log2(1e8 / n)) + 1;
@@ -95,7 +95,8 @@ Result ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::vector
 Result RandomGreedy(uint64_t n, uint64_t backpack_weight, const std::vector<Item>& input) {
     Result best_backpack;
     for (size_t i = 0; i < 1e8 / n; ++i) {
-        best_backpack = std::max(RandomGreedyTmp(backpack_weight, input), best_backpack);
+      best_backpack =
+          std::max(RandomGreedyOnce(backpack_weight, input), best_backpack);
     }
     return best_backpack;
 }
