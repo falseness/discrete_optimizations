@@ -4,26 +4,23 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_set>
-#include <deque>
+#include <vector>
 #include <cassert>
+#include <numeric>
 #include <cmath>
 
-
-struct Item {
-    uint64_t cost;
-    uint64_t weight;
-};
-
-bool comp(const Item& lhs, const Item& rhs) {
-    return lhs.cost * rhs.weight > rhs.cost * lhs.weight;
-}
+#include <input.hpp>
 
 struct Result {
     std::unordered_set<size_t> indices = {};
     uint64_t cost = 0;
     uint64_t weight = 0;
 
-    void Insert(const size_t index, const std::deque<Item>& input) {
+    auto operator<(const Result& other) const {
+        return cost < other.cost;
+    }
+
+    void Insert(const size_t index, const std::vector<Item>& input) {
         bool inserted = indices.insert(index).second;
         assert(inserted);
         cost += input.at(index).cost;
@@ -31,7 +28,7 @@ struct Result {
     }
 };
 
-bool IsCorrect(const Result& result, uint64_t backpack_weight, const std::deque<Item>& input) {
+bool IsCorrect(const Result& result, uint64_t backpack_weight, const std::vector<Item>& input) {
     uint64_t current_weight = 0;
     uint64_t current_cost = 0;
     for (auto index : result.indices) {
@@ -48,7 +45,7 @@ bool IsCorrect(const Result& result, uint64_t backpack_weight, const std::deque<
 }
 
 Result GetGreedy(const uint64_t backpack_weight, const size_t index_to_start,
-                 const std::deque<Item> &input) {
+                 const std::vector<Item> &input) {
   Result result;
   for (size_t i = index_to_start; i < input.size(); ++i) {
     if (result.weight + input[i].weight <= backpack_weight) {
@@ -69,29 +66,27 @@ double RandDouble(double fMin, double fMax)
     return fMin + f * (fMax - fMin);
 }
 
-uint64_t RandomGreedyTmp(uint64_t backpack_weight, const std::deque<Item>& input) {
-    uint64_t current_weight = 0;
-    uint64_t current_cost = 0;
+Result RandomGreedyTmp(uint64_t backpack_weight, const std::vector<Item>& input) {
+    Result backpack;
     for (size_t i = 0; i < input.size(); ++i) {
         const auto& item = input[i];
-        double chance = 1 / (double)(input.size() - i + 1);
+        double chance = 1 / (double)(input.size() + 1);
         if (RandDouble(0.0, 1.0) < chance) {
             continue;
         }
-        if (current_weight + item.weight <= backpack_weight) {
-            current_weight += item.weight;
-            current_cost += item.cost;
+        if (backpack.weight + item.weight <= backpack_weight) {
+            backpack.Insert(i, input);
         }
     }
-    return current_cost;
+    return backpack;
 }
 
 
-uint64_t ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::deque<Item>& input) {
+Result ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::vector<Item>& input) {
     size_t first_elements = std::round(std::log2(1e8 / n)) + 1;
     first_elements = std::min(first_elements, n);
 
-    uint64_t best_result = 0;
+    Result best_backpack;
 
     for (size_t mask = 0; mask < (1 << first_elements); ++mask) {
         Result result;
@@ -110,37 +105,46 @@ uint64_t ExponentialGreedy(uint64_t n, uint64_t backpack_weight, const std::dequ
         }
         assert(IsCorrect(another_result, backpack_weight, input));
 
-        best_result = std::max(best_result, another_result.cost);
+        best_backpack = std::max(best_backpack, another_result);
     }
-    return best_result;
+    return best_backpack;
 }
 
-uint64_t RandomGreedy(uint64_t n, uint64_t backpack_weight, const std::deque<Item>& input) {
-    uint64_t best_result = 0;
+Result RandomGreedy(uint64_t n, uint64_t backpack_weight, const std::vector<Item>& input) {
+    Result best_backpack;
     for (size_t i = 0; i < 1e8 / n; ++i) {
-        best_result = std::max(RandomGreedyTmp(backpack_weight, input), best_result);
+        best_backpack = std::max(RandomGreedyTmp(backpack_weight, input), best_backpack);
     }
-    return best_result;
+    return best_backpack;
 }
 
 
-void run() {
-    std::ifstream fin("./data/ks_400_0");
-    uint64_t n, backpack_weight;
-    fin >> n >> backpack_weight;
-    std::deque<Item> input;
-    for (size_t i = 0; i < n; ++i) {
-        uint64_t cost, weight;
-        fin >> cost >> weight;
-        input.push_back(Item{cost, weight});
+int main(int argc, char *argv[]) {
+    assert(argc == 2);
+    auto input = ReadFromFile(argv[1]);
+    // хочу посортить входные данные,
+    // при этом далее по индексам в посорченных данных хочу далее восстановить старые 
+    std::vector<size_t> sorted_indices(input.n);
+    std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
+    std::sort(sorted_indices.begin(), sorted_indices.end(), [&](size_t lhs, size_t rhs) {
+        return input.items[lhs].cost * input.items[lhs].weight > input.items[lhs].cost * input.items[lhs].weight;
+    });
+    std::vector<Item> sorted_items;
+    sorted_items.reserve(input.n);
+    for (auto index : sorted_indices) {
+        sorted_items.push_back(input.items[index]);
     }
-    std::sort(input.begin(), input.end(), comp);
-    // /*
-    
-    std::cout << std::max(RandomGreedy(n, backpack_weight, input), ExponentialGreedy(n, backpack_weight, input));
-}
+    input.items = std::move(sorted_items);
+
+    std::vector<size_t> inverse_permutation(input.n);
+    for (size_t i = 0; i < input.n; ++i) {
+        inverse_permutation[sorted_indices[i]] = i;
+    }
 
 
-int main() {
-    run();
+    auto result = std::max(RandomGreedy(input.n, input.backpack_weight, input.items), ExponentialGreedy(input.n, input.backpack_weight, input.items));
+    std::cout << result.indices.size() << '\n';
+    for (auto index : result.indices) {
+        std::cout << inverse_permutation[index] << ' ';
+    }
 }
