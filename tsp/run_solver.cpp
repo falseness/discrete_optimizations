@@ -11,9 +11,9 @@
 #include <queue>
 
 struct Point {
-    int64_t x;
-    int64_t y;
-    int64_t LengthSquared() const {
+    long double x;
+    long double y;
+    long double LengthSquared() const {
         return x * x + y * y;
     }
 };
@@ -23,7 +23,7 @@ Point operator-(const Point& p1, const Point& p2) {
 }
 
 
-int64_t EuclidianDistanceSquared(const Point& p1, const Point& p2) {
+long double EuclidianDistanceSquared(const Point& p1, const Point& p2) {
     return (p1 - p2).LengthSquared();
 }
 
@@ -187,7 +187,7 @@ void BeamSearch(std::vector<Point>& best_result, const size_t elements_per_itera
         queue.pop();
     }
     if (queue.top().distance_dt >= 0) {
-        return;
+        // return;
     }
     for (const auto& command : queue.top().commands) {
         std::swap(best_result[command.i], best_result[command.j]);
@@ -206,8 +206,8 @@ int main() {
     assert (n > 1);
     std::vector<Point> points;
     for (size_t i = 0; i < n; ++i) {
-        int64_t x;
-        int64_t y;
+        long double x;
+        long double y;
         fin >> x >> y;
         points.push_back(Point{.x = x, .y = y});
     }
@@ -245,7 +245,7 @@ int main() {
         BeamSearch(best_result, 10, 10);
         if (i % 40 == 0) {
             std::cout << "jump befor " << i << ' ' << EuclidianDistance(best_result) << '\n';
-            BeamSearch(best_result, 150, 25);
+            BeamSearch(best_result, 500, 50);
             std::cout << "jump after " << i << ' ' << EuclidianDistance(best_result) << '\n';
         }
     }
