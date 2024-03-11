@@ -8,6 +8,7 @@
 #include <numeric>
 #include <cmath>
 #include <list>
+#include <random>
 #include <queue>
 
 struct Point {
@@ -174,7 +175,7 @@ void BeamSearch(std::vector<Point>& best_result, const size_t elements_per_itera
                 next_queue.pop();
             }
         }
-        next_queue.push(Vertex{.distance_dt = 0.0, .commands = {}});
+        // next_queue.push(Vertex{.distance_dt = 0.0, .commands = {}});
         while (next_queue.size() > elements_per_iterations) {
             next_queue.pop();
         }
@@ -194,9 +195,87 @@ void BeamSearch(std::vector<Point>& best_result, const size_t elements_per_itera
     }
 }
 
+bool ChanceProc(long double chance) {
+    return RandDouble(0.0, 1.0) <= chance;
+}
+
+long double CalculateTransitionChance(long double new_minus_old_energy, long double temperature) {
+    return std::exp(-new_minus_old_energy / temperature);
+}
 
 
+long double CalculateDistance(size_t index1, size_t index2, std::vector<Point>& best_result) {
+    long double result = 0.0;
+    for (auto index : {index1, index2}) {
+        result += EuclidianDistance(get_previous(index, best_result), best_result[index]) + 
+            EuclidianDistance(best_result[index], get_next(index, best_result));
+    }
+    return result;
+}
 
+long double CalculateNeighbouringDistance(size_t i, std::vector<Point>& best_result) {
+    return EuclidianDistance(get_previous(i, best_result), best_result[i]) + 
+    EuclidianDistance(get_next(i, best_result), get_next(next_index(i, best_result), best_result));
+}
+
+class Annealing {
+    Annealing(std::vector<Point>& best_result, long double temperature, std::mt19937& rng) : best_result(best_result), temperature(temperature),
+        rng(rng), uni_i(0, best_result.size() - 2) {}
+    void Step() {
+        RecursiveStep(0, 0);
+    }
+private:
+    bool RecursiveStep(size_t recursion_iter, long double previous_distance_difference) {
+        if (recursion_iter >= 2) {
+            return ChanceProc(CalculateTransitionChance(previous_distance_difference, temperature));
+        }
+        int i = uni_i(rng);
+        std::uniform_int_distribution<int> uni_j(i + 1, best_result.size() - 1);
+        int j = uni_j(rng);
+        assert(i < j);
+        const bool are_neighbouring = (i + 1 == j) || (i == 0 && j + 1 == best_result.size());
+        if (!are_neighbouring) {
+            auto current_distance = CalculateDistance(i, j, best_result);
+            // auto another_current_distance = EuclidianDistance(best_result);
+            std::swap(best_result[i], best_result[j]);
+            auto new_distance = CalculateDistance(i, j, best_result);
+            // auto another_new_distance = EuclidianDistance(best_result);
+            // assert(std::abs((new_distance - current_distance) - (another_new_distance - another_current_distance)) < 0.001);
+            if (!ChanceProc(CalculateTransitionChance(new_distance - current_distance, temperature))) {
+                std::swap(best_result[i], best_result[j]);
+            }
+            bool result = RecursiveStep(recursion_iter + 1, previous_distance_difference + new_distance);
+            if (!result) {
+                std::swap(best_result[i], best_result[j]);
+            } 
+            return result;
+        }
+        if (i == 0 && j + 1 == best_result.size()) {
+            std::swap(i, j);
+        }
+        auto current_distance = CalculateNeighbouringDistance(i, best_result);
+        // auto another_current_distance = EuclidianDistance(best_result);
+
+        std::swap(best_result[i], best_result[j]);
+        auto new_distance = CalculateNeighbouringDistance(i, best_result);
+        // auto another_new_distance = EuclidianDistance(best_result);
+        // auto dt_fast = new_distance - current_distance;
+        bool result = RecursiveStep(recursion_iter + 1, previous_distance_difference + new_distance);
+        if (!result) {
+            std::swap(best_result[i], best_result[j]);
+        } 
+        return result;
+    } 
+
+    std::mt19937& rng; 
+    std::uniform_int_distribution<int> uni_i;
+    std::vector<Point> best_result;
+    long double temperature;
+};
+
+void Step(std::vector<Point>& best_result, size_t recursion_iter, long double previous_distance_difference, long double ) {
+
+}
 
 int main() {
     std::ifstream fin("./data/tsp_51_1");
@@ -226,29 +305,89 @@ int main() {
         }
         return {best_result.begin(), best_result.end()};
     }();
-    // auto best_result = points;
-    std::cout << "iter0 " << EuclidianDistance(best_result) << '\n';
     
-    for (size_t i = 0; i < 100; ++i) {
-        BeamSearch(best_result, 1, 1);
-    }
-    std::cout << "iter1 " << EuclidianDistance(best_result) << '\n';
-    for (size_t i = 0; i < 100; ++i) {
-        BeamSearch(best_result, 5, 2);
-    }
-    std::cout << "iter2 " << EuclidianDistance(best_result) << '\n';
-    // for (size_t i = 0; i < 1000; ++i) {
-    //     TrySwapNodes(best_result);
-    // }
-    const size_t count = 200;
-    for (size_t i = 0; i < count; ++i) {
-        BeamSearch(best_result, 10, 10);
-        if (i % 40 == 0) {
-            std::cout << "jump befor " << i << ' ' << EuclidianDistance(best_result) << '\n';
-            BeamSearch(best_result, 500, 50);
-            std::cout << "jump after " << i << ' ' << EuclidianDistance(best_result) << '\n';
+
+    assert(best_result.size() >= 2);
+    std::random_device rd;     // Only used once to initialise (seed) engine
+    std::mt19937 rng(rd());    //
+    std::uniform_int_distribution<int> uni(0, best_result.size() - 2);
+    
+    const size_t cycles_count = 1e9;
+    int tmp = cycles_count / 10;
+    for (size_t cycle = 0; cycle < cycles_count; ++cycle) {
+        // long double temperature = (cycles_count - cycle) / (long double)cycles_count;
+        const long double first_value = 0.9;
+        const long double second_value = 0.1;
+        // long double temperature = -1 * (cycle - first_value) + first_value;
+        long double n = (long double)cycles_count;
+        // long double temperature = (n - cycle) / n;
+        long double x = std::log2(1 + cycle / n);
+        long double a = (second_value - first_value) / (std::log2(1 + (n - 1) / n));
+        long double b = first_value - a * 0;
+        long double temperature = a * x + b;
+        temperature *= 5;
+        if (cycle % tmp == 0) {
+            std::cout << "RESULT " << cycle / tmp << ' ' << EuclidianDistance(best_result) << ' ' << temperature << '\n';
+        }
+        // temperature /= 100.0;
+        int i = uni(rng);
+        std::uniform_int_distribution<int> uni_j(i + 1, best_result.size() - 1);
+        int j = uni_j(rng);
+        assert(i < j);
+        const bool are_neighbouring = (i + 1 == j) || (i == 0 && j + 1 == best_result.size());
+        if (!are_neighbouring) {
+            auto current_distance = calc_distance(i, j);
+            // auto another_current_distance = EuclidianDistance(best_result);
+            std::swap(best_result[i], best_result[j]);
+            auto new_distance = calc_distance(i, j);
+            // auto another_new_distance = EuclidianDistance(best_result);
+            // assert(std::abs((new_distance - current_distance) - (another_new_distance - another_current_distance)) < 0.001);
+            if (!ChanceProc(CalculateTransitionChance(new_distance - current_distance, temperature))) {
+                std::swap(best_result[i], best_result[j]);
+            }
+            continue;
+        }
+        if (i == 0 && j + 1 == best_result.size()) {
+            std::swap(i, j);
+        }
+        auto current_distance = calc_neighbouring_distance(i);
+        // auto another_current_distance = EuclidianDistance(best_result);
+
+        std::swap(best_result[i], best_result[j]);
+        auto new_distance = calc_neighbouring_distance(i);
+        // auto another_new_distance = EuclidianDistance(best_result);
+        auto dt_fast = new_distance - current_distance;
+        // auto dt_real = ano
+        // auto dt_real = another_new_distance - another_current_distance;
+        // auto dt = std::abs(dt_real - dt_fast);
+        // assert(dt < 0.001);
+        if (!ChanceProc(CalculateTransitionChance(new_distance - current_distance, temperature))) {
+            std::swap(best_result[i], best_result[j]);
         }
     }
+    // auto best_result = points;
+    // std::cout << "iter0 " << EuclidianDistance(best_result) << '\n';
+    
+    // for (size_t i = 0; i < 100; ++i) {
+    //     BeamSearch(best_result, 1, 1);
+    // }
+    // std::cout << "iter1 " << EuclidianDistance(best_result) << '\n';
+    // for (size_t i = 0; i < 100; ++i) {
+    //     BeamSearch(best_result, 5, 2);
+    // }
+    // std::cout << "iter2 " << EuclidianDistance(best_result) << '\n';
+    // // for (size_t i = 0; i < 1000; ++i) {
+    // //     TrySwapNodes(best_result);
+    // // }
+    // const size_t count = 200;
+    // for (size_t i = 0; i < count; ++i) {
+    //     BeamSearch(best_result, 10, 10);
+    //     if (i % 40 == 0) {
+    //         std::cout << "jump befor " << i << ' ' << EuclidianDistance(best_result) << '\n';
+    //         BeamSearch(best_result, 500, 50);
+    //         std::cout << "jump after " << i << ' ' << EuclidianDistance(best_result) << '\n';
+    //     }
+    // }
     
     // std::cout << "res " << EuclidianDistance(best_result) << '\n';
     // BeamSearch(best_result, n, 25);
