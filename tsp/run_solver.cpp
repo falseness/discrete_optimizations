@@ -281,8 +281,14 @@ void Step(std::vector<Point>& best_result, size_t recursion_iter, long double pr
 
 }
 
+long double GetMedian(std::vector<long double>&& arr) {
+    auto arr_center_it = arr.begin() + arr.size() / 2;
+    std::nth_element(arr.begin(), arr_center_it, arr.end());
+    return *arr_center_it;
+}
+
 int main() {
-    std::ifstream fin("./data/tsp_51_1");
+    std::ifstream fin("./data/tsp_574_1");
     int n;
     fin >> n;
     // don't forget
@@ -294,35 +300,54 @@ int main() {
         fin >> x >> y;
         points.push_back(Point{.x = x, .y = y});
     }
-    auto best_result = points;
-    // auto best_result = [&]() -> std::vector<Point> {
-    //     std::list<Point> best_result = TryGreedy(points);
-    //     long double best_distance = EuclidianDistance(best_result);
+    // auto greedy_result = TryGreedy(points); 
+    // auto best_result = {greedy_result.begin(), greedy_result.end()};
+    // auto best_result = points;
+    auto best_result = [&]() -> std::vector<Point> {
+        std::list<Point> best_result = TryGreedy(points);
+        long double best_distance = EuclidianDistance(best_result);
         
-    //     for (size_t i = 0; i < 1000; ++i) {
-    //         auto result = TryGreedy(points);
-    //         const long double distance = EuclidianDistance(result);
-    //         if (distance < best_distance) {
-    //             best_distance = distance;
-    //             best_result = std::move(result);
-    //         }
-    //     }
-    //     return {best_result.begin(), best_result.end()};
-    // }();
+        for (size_t i = 0; i < 1; ++i) {
+            auto result = TryGreedy(points);
+            const long double distance = EuclidianDistance(result);
+            if (distance < best_distance) {
+                best_distance = distance;
+                best_result = std::move(result);
+            }
+        }
+        return {best_result.begin(), best_result.end()};
+    }();
+    
     
 
     assert(best_result.size() >= 2);
     std::random_device rd;     // Only used once to initialise (seed) engine
     std::mt19937 rng(rd());    //
     std::uniform_int_distribution<int> uni(0, best_result.size() - 2);
+
+    //  long double average_dist = 0.0;
+    // const size_t count_iter = 10000;
+    // for (size_t i = 0; i < count_iter; ++i) {
+
+    // }
     
-    const size_t cycles_count = 1e8;
+    const size_t cycles_count = 1e9;
     int tmp = cycles_count / 10;
-    for (auto recursion_iterations_count : {2}) {
+    std::vector<long double> xs;
+    std::vector<long double> ys;
+    for (const auto& point : points) {
+        xs.push_back(point.x);
+        ys.push_back(point.y);
+    }
+    auto x_median = *std::max_element(xs.begin(), xs.end()) - *std::min_element(xs.begin(), xs.end());
+    auto y_median = *std::max_element(ys.begin(), ys.end()) - *std::min_element(ys.begin(), ys.end());
+    auto length = EuclidianDistance(best_result) / best_result.size();
+
+    for (auto recursion_iterations_count : {1}) {
         for (size_t cycle = 0; cycle < cycles_count; ++cycle) {
             // long double temperature = (cycles_count - cycle) / (long double)cycles_count;
-            const long double first_value = 0.9;
-            const long double second_value = 0.15;
+            const long double first_value = 5;
+            const long double second_value = 0.5;
             // long double temperature = -1 * (cycle - first_value) + first_value;
             long double n = (long double)cycles_count;
             // long double temperature = (n - cycle) / n;
@@ -330,7 +355,7 @@ int main() {
             long double a = (second_value - first_value) / (std::log2(1 + (n - 1) / n));
             long double b = first_value - a * 0;
             long double temperature = a * x + b;
-            temperature *= 5;
+            temperature *= length / 10.0;
             if (cycle % tmp == 0) {
                 std::cout << "RESULT " << cycle / tmp << ' ' << EuclidianDistance(best_result) << ' ' << temperature << '\n';
             }
@@ -376,7 +401,7 @@ int main() {
     
     std::cout << best_distance << '\n' << std::endl;
     for (const auto& point : best_result) {
-        std::cout << "{x: " << point.x << ", y: " << point.y << "}, ";
+        // std::cout << "{x: " << point.x << ", y: " << point.y << "}, ";
     }
     
 
